@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Institutional Algo Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <style>
+        /* Pro Dark Theme Custom Scrollbars */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #080a0f; }
+        ::-webkit-scrollbar-thumb { background: #1f293d; border-radius: 4px; }
+        
+        .chart-fullscreen {
+            position: fixed !important;
+            top: 0; left: 0; width: 100vw !important; height: 100vh !important;
+            z-index: 9999; padding: 12px; background: #080a0f;
+        }
+    </style>
+</head>
+<body class="bg-[#080a0f] text-slate-100 min-h-screen p-4 font-sans antialiased selection:bg-emerald-500 selection:text-black">
+
+    <!-- Top Navigation Header Bar -->
+    <div class="flex justify-between items-center bg-[#11141d] px-5 py-3 rounded-xl mb-4 border border-slate-800/80 shadow-2xl">
+        <div class="flex items-center space-x-3">
+            <div id="statusDot" class="h-3 w-3 rounded-full bg-slate-600"></div>
+            <div>
+                <h1 class="text-lg font-black tracking-wider text-white uppercase flex items-center gap-2">
+                    PRO QUANT <span class="text-emerald-400">TERMINAL</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 font-mono">Status: <span id="engineStatus" class="font-bold text-amber-400">STOPPED</span></p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleFullscreen()" class="bg-[#181c28] hover:bg-slate-700 text-slate-300 border border-slate-700/80 font-bold px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shadow-sm">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                FULLSCREEN
+            </button>
+            <button onclick="startAlgo()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-1.5 rounded-lg text-xs tracking-wider transition shadow-lg shadow-emerald-950/50">START ALGO</button>
+            <button onclick="stopAlgo()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-1.5 rounded-lg text-xs tracking-wider transition shadow-lg shadow-rose-950/50">STOP ALGO</button>
+        </div>
+    </div>
+
+    <!-- Live Performance Metrics Grid (6 Analytics Cards) -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+        <div class="bg-[#11141d] p-3 rounded-xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Account Balance</span>
+            <h2 id="balance" class="text-lg font-black text-white font-mono mt-1">₹50,000.00</h2>
+        </div>
+        <div class="bg-[#11141d] p-3 rounded-xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Today P&L</span>
+            <h2 id="todayPnl" class="text-lg font-black text-emerald-400 font-mono mt-1">₹0.00</h2>
+        </div>
+        <div class="bg-[#11141d] p-3 rounded-xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Weekly P&L</span>
+            <h2 id="weeklyPnl" class="text-lg font-black text-emerald-400 font-mono mt-1">₹0.00</h2>
+        </div>
+        <div class="bg-[#11141d] p-3 rounded-xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Monthly P&L</span>
+            <h2 id="monthlyPnl" class="text-lg font-black text-emerald-400 font-mono mt-1">₹0.00</h2>
+        </div>
+        <div class="bg-[#11141d] p-3 rounded-xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total Trades</span>
+            <h2 id="tradeCount" class="text-lg font-black text-white font-mono mt-1">0</h2>
+        </div>
+        <div class="bg-[#11141d] p-3 rounded-xl border border-slate-800/80 shadow-lg relative overflow-hidden">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Win Ratio / Rate</span>
+            <h2 id="winRatio" class="text-lg font-black text-cyan-400 font-mono mt-1">0W / 0L (0%)</h2>
+        </div>
+    </div>
+
+    <!-- Extended Chart Monitor -->
+    <div id="chartCard" class="bg-[#11141d] p-4 rounded-xl border border-slate-800/80 mb-4 shadow-2xl transition-all duration-300">
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <span class="h-2 w-2 rounded-full bg-emerald-400"></span> Live Interactive Chart (BSE:RELIANCE)
+            </h3>
+            <button onclick="toggleFullscreen()" class="text-[11px] text-slate-400 hover:text-white transition">Maximize View</button>
+        </div>
+        <div id="tradingview_chart" class="h-[580px] w-full rounded-lg overflow-hidden border border-slate-800/60"></div>
+    </div>
+
+    <!-- Institutional Order Execution Analytics Table -->
+    <div class="bg-[#11141d] p-4 rounded-xl border border-slate-800/80 shadow-2xl">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Live Execution Analytics & Trigger Reasons</h3>
+            <span class="text-[10px] text-slate-500 font-mono bg-[#080a0f] px-2 py-0.5 rounded border border-slate-800">1m Candle Scan</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-[#080a0f] uppercase text-[10px] tracking-wider text-slate-400 border-b border-slate-800">
+                    <tr>
+                        <th class="p-3">Time</th>
+                        <th class="p-3">Symbol</th>
+                        <th class="p-3">Action</th>
+                        <th class="p-3">Price</th>
+                        <th class="p-3">Trigger Reason (Why Trade?)</th>
+                        <th class="p-3">P&L (Net)</th>
+                        <th class="p-3">P&L (%)</th>
+                    </tr>
+                </thead>
+                <tbody id="tradeLogs" class="divide-y divide-slate-800/50 font-mono">
+                    <tr><td colspan="7" class="p-4 text-center text-slate-600 italic">No trades executed yet. Engine listening for signals...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+
+        new TradingView.widget({
+            "autosize": true,
+            "symbol": "BSE:RELIANCE",
+            "interval": "1",
+            "timezone": "Asia/Kolkata",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "toolbar_bg": "#11141d",
+            "enable_publishing": false,
+            "allow_symbol_change": true,
+            "container_id": "tradingview_chart"
+        });
+
+        function toggleFullscreen() {
+            document.getElementById('chartCard').classList.toggle('chart-fullscreen');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('chartCard').classList.remove('chart-fullscreen');
+            }
+        });
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/status`);
+                const data = await res.json();
+
+                const isRunning = data.is_running;
+                document.getElementById('engineStatus').innerText = isRunning ? 'RUNNING' : 'STOPPED';
+                document.getElementById('engineStatus').className = isRunning ? 'font-bold text-emerald-400' : 'font-bold text-rose-500';
+                document.getElementById('statusDot').className = isRunning ? 'h-3 w-3 rounded-full bg-emerald-500 animate-ping' : 'h-3 w-3 rounded-full bg-rose-600';
+
+                // Balance & Date-wise P&L Metrics Update
+                document.getElementById('balance').innerText = `₹${data.paper_balance.toFixed(2)}`;
+
+                const formatPnl = (val, fmtStr) => {
+                    const el = document.getElementById(val);
+                    el.innerText = fmtStr;
+                    el.className = data[val] >= 0 ? 'text-lg font-black text-emerald-400 font-mono mt-1' : 'text-lg font-black text-rose-500 font-mono mt-1';
+                };
+
+                formatPnl('todayPnl', data.today_pnl_fmt);
+                formatPnl('weeklyPnl', data.weekly_pnl_fmt);
+                formatPnl('monthlyPnl', data.monthly_pnl_fmt);
+
+                document.getElementById('tradeCount').innerText = data.total_trades;
+                document.getElementById('winRatio').innerText = `${data.winning_trades}W / ${data.losing_trades}L (${data.win_rate}%)`;
+
+                const logsBody = document.getElementById('tradeLogs');
+                if (data.trades_log && data.trades_log.length > 0) {
+                    logsBody.innerHTML = data.trades_log.map(t => {
+                        const actionColor = t.action === 'BUY' ? 'text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40' : 'text-rose-400 font-bold bg-rose-950/40 px-2 py-0.5 rounded border border-rose-800/40';
+                        const pnlColor = t.pnl.includes('+') ? 'text-emerald-400 font-bold' : (t.pnl.includes('-') && t.pnl !== '-' ? 'text-rose-400 font-bold' : 'text-slate-400');
+                        return `
+                            <tr class="hover:bg-slate-800/30 transition">
+                                <td class="p-3 font-mono text-slate-400">${t.time}</td>
+                                <td class="p-3 font-bold text-white">${t.symbol}</td>
+                                <td class="p-3"><span class="${actionColor}">${t.action}</span></td>
+                                <td class="p-3 font-mono text-white">₹${t.price}</td>
+                                <td class="p-3 text-xs text-slate-300 font-sans">${t.reason}</td>
+                                <td class="p-3 font-mono ${pnlColor}">${t.pnl}</td>
+                                <td class="p-3 font-mono ${pnlColor}">${t.pnl_pct}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error("Status Error:", e);
+            }
+        }
+
+        async function startAlgo() {
+            await fetch(`${API_BASE}/start-algo`, { method: 'POST' });
+            fetchStatus();
+        }
+
+        async function stopAlgo() {
+            await fetch(`${API_BASE}/stop-algo`, { method: 'POST' });
+            fetchStatus();
+        }
+
+        setInterval(fetchStatus, 2000);
+    </script>
+</body>
+</html>
